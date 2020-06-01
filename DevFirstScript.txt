@@ -1,0 +1,48 @@
+pipeline {
+    agent any
+    tools {nodejs "Node"}
+    stages {
+        stage('Preparation') {
+            steps{
+                git branch: "master",
+                url: 'https://github.com/Sanket-Mishra/CICD.git',
+                credentialsId: 'sanket-git'
+            }
+        }
+        stage('Deploy to Dev') {
+            environment{
+                RETRY = '80'
+            }
+            steps {
+                bat  'apictl add-env -e dev --apim https://localhost:9443 --token https://localhost:8243/token'
+                echo 'Logging into DEV'
+                bat 'apictl login dev -u admin -p admin -k' 
+                echo 'Deploying to dev'
+                bat 'apictl import-api -f . -e dev -k --preserve-provider --update --verbose'
+            }
+        }
+        stage('Deploy to Production') {
+            environment{
+                RETRY = '60'
+            }
+            steps {
+              bat  'apictl add-env -e prod --apim https://localhost:9444 --token https://localhost:8244/token'
+                bat 'echo "Logging into PROD"'
+                bat 'apictl login prod -u admin -p admin -k' 
+                echo 'Deploying to Production'
+                bat 'apictl import-api -f . -e prod -k --preserve-provider --update --verbose'
+            }
+        }
+    }
+    post {
+        cleanup {
+            deleteDir()
+            dir("${workspace}@tmp") {
+                deleteDir()
+            }
+            dir("${workspace}@script") {
+                deleteDir()
+            }
+        }
+    }
+}
